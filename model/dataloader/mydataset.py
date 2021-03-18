@@ -12,6 +12,7 @@ from typing import List
 
 import torch
 from torch.utils.data import Dataset
+from transformers import AutoTokenizer
 
 from config.hyper import hyper
 from utils.utils import read_vocab
@@ -27,6 +28,8 @@ class MultiHeadDataset(Dataset):
         self.label2index = read_vocab(hyper.label_path)
         self.tokens = []
         self.labels = []
+        if hyper.encoder == "bert":
+            self.tokenizer = AutoTokenizer.from_pretrained(hyper.bert_base_chinese)
         instances = []
         for line in open(file_path, 'r', encoding='utf8'):
             line = line.strip("\n")
@@ -39,7 +42,10 @@ class MultiHeadDataset(Dataset):
     def __getitem__(self, index):
         token = self.tokens[index]
         label = self.labels[index]
-        tokens_id = self.token2tensor(token)
+        if hyper.encoder == "bert":
+            tokens_id = self.bert_token2id(token)
+        else:
+            tokens_id = self.token2tensor(token)
         label_id = self.label2tensor(label)
         return tokens_id, label_id, token, label
 
@@ -56,3 +62,8 @@ class MultiHeadDataset(Dataset):
     def label2tensor(self, label):
         unk_id = self.label2index['<unk>']
         return self.label2index.get(label, unk_id)
+
+    def bert_token2id(self, text: List[str]):
+        text = self.tokenizer.clean_up_tokenization("".join(text))
+        inputs = self.tokenizer(text, return_tensors="pt", max_length=512, padding="max_length", truncation=True)
+        return inputs

@@ -13,7 +13,7 @@ import torch
 from torch.utils.data.dataloader import DataLoader
 
 
-class Batch_reader(object):
+class BatchReader(object):
     def __init__(self, data):
         """
 
@@ -33,7 +33,7 @@ class Batch_reader(object):
 
 
 def collate_fn(batch):
-    return Batch_reader(batch)
+    return BatchReader(batch)
 
 
 textcnn_loader = partial(DataLoader, collate_fn=collate_fn, pin_memory=True)

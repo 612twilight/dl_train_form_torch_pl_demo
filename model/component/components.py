@@ -14,3 +14,7 @@ def description(epoch, epoch_num, output):
     return "L: {:.2f}, L_crf: {:.2f}, L_selection: {:.2f}, epoch: {}/{}:".format(
         output['loss'].item(), output['crf_loss'].item(),
         output['selection_loss'].item(), epoch, epoch_num)
+
+
+def transformers_bert_batch():
+    pass

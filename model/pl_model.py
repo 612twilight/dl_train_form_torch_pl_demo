@@ -7,12 +7,16 @@ Author: gaoyw
 Create Date: 2021/3/17
 -------------------------------------------------
 """
+from typing import Any, Optional, List
+
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from sklearn.metrics import f1_score
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
+
+from model.dataloader.mydataloader import BatchReader
 
 
 class TextCNNPlModel(pl.LightningModule):
@@ -45,28 +49,58 @@ class TextCNNPlModel(pl.LightningModule):
     def configure_optimizers(self):
         return Adam(self.parameters(), lr=1e-3)
 
-    def training_step(self, batch_data, batch_idx):
-        token_ids = batch_data.token_ids
-        label_ids = batch_data.label_ids
-        embedding = self.embedding(token_ids)
+    def forward(self, x):
+        embedding = self.embedding(x)
         x = embedding.permute(0, 2, 1)
         out = [conv(x).unsqueeze(2) for conv in self.conv1ds]
         out = torch.cat(out, dim=2)
-        out = out.view(x.size(0), -1)
-        loss = self.loss_func(out, label_ids)
-        return {"loss": loss, "logits": out}
+        logits = out.view(x.size(0), -1)
+        return logits
 
-    def validation_step(self, batch_data, batch_idx):
-        token_ids = batch_data.token_ids
-        label_ids = batch_data.label_ids
-        embedding = self.embedding(token_ids)
-        x = embedding.permute(0, 2, 1)
-        out = [conv(x).unsqueeze(2) for conv in self.conv1ds]
-        out = torch.cat(out, dim=2)
-        out = out.view(x.size(0), -1)
-        loss = self.loss_func(out, label_ids)
-        pred = torch.argmax(out, dim=-1)
-        val_f1 = f1_score(y_true=label_ids.detach().numpy(), y_pred=pred.detach().numpy(),average="micro")
+    def _transfer_batch_to_device(self, batch: Any, device: Optional[torch.device] = None) -> Any:
+        if isinstance(batch, BatchReader):
+            # move all tensors in your custom data structure to the device
+            batch.token_ids = batch.token_ids.to(device)
+            batch.label_ids = batch.label_ids.to(device)
+        else:
+            batch = super().transfer_batch_to_device(batch, device)
+        return batch
+
+    def training_step(self, batch, batch_idx):
+        batch = self._transfer_batch_to_device(batch)
+        logits = self(batch.token_ids)
+        loss = self.loss_func(logits, batch.label_ids)
+        return {"loss": loss, "logits": logits}
+
+    def validation_step(self, batch, batch_idx):
+        batch = self._transfer_batch_to_device(batch)
+        logits = self(batch.token_ids)
+        loss = self.loss_func(logits, batch.label_ids)
+        y_pred = torch.argmax(logits, dim=-1).detach().cpu().numpy()
+        y_true = batch.label_ids.detach().cpu().numpy()
+        return {"loss": loss, "true": y_true, "pred": y_pred}
+
+    def validation_epoch_end(self, outputs: List[Any]) -> None:
+        y_true = []
+        y_pred = []
+        for output in outputs:
+            y_true.append(output["true"])
+            y_pred.append(output["pred"])
+        val_f1 = f1_score(y_true=y_true,
+                          y_pred=y_pred,
+                          average="micro")
+        self.log("val_f1", val_f1, prog_bar=True)
+
+    def test_step(self, batch, batch_idx):
+        return self.validation_step(batch, batch_idx)
+
+    def test_epoch_end(self, outputs: List[Any]) -> None:
+        y_true = []
+        y_pred = []
+        for output in outputs:
+            y_true.append(output["true"])
+            y_pred.append(output["pred"])
+        val_f1 = f1_score(y_true=y_true,
+                          y_pred=y_pred,
+                          average="micro")
         self.log("val_f1", val_f1)
-        return {"loss": loss, "val_f1": val_f1}
-

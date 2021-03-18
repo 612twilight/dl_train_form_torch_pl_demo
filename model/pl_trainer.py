@@ -7,14 +7,10 @@ Author: gaoyw
 Create Date: 2020/12/8
 -------------------------------------------------
 """
-import os
 
 import pytorch_lightning as pl
-import torch
-from prefetch_generator import BackgroundGenerator
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.optim import Adam, SGD
-from tqdm import tqdm
 from transformers import AdamW
 
 from config.hyper import hyper
@@ -30,12 +26,12 @@ class PlRunner(object):
         self.exp_name = exp_name
         self.model_dir = hyper.model_dir
 
-        self.gpu = hyper.gpu
         self.preprocessor = Preprocessing()
         self.triplet_metrics = F1_triplet()
         self.ner_metrics = F1_ner()
         self.optimizer = None
         self.model = None
+        self.callbacks = dict()
 
     def _optimizer(self, name, model):
         m = {
@@ -45,67 +41,62 @@ class PlRunner(object):
         }
         return m[name]
 
-    def _init_model(self):
-        self.model = TextCNNPlModel()
+    def _init_model(self, load_pre=False, mode="train"):
+        if not load_pre:
+            self.model = TextCNNPlModel()
+        else:
+            self.model = TextCNNPlModel.load_from_checkpoint(hyper.checkpoint_path)
 
     def preprocessing(self):
         self.preprocessor.preprocess()
+
+    def _init_callbacks(self):
+        checkpoint_callback = ModelCheckpoint(monitor="val_f1",
+                                              save_top_k=2,
+                                              dirpath=hyper.model_dir,
+                                              filename='model-{epoch:02d}-{val_f1:.2f}',
+                                              mode="max")
+        self.callbacks["checkpoint_callback"] = checkpoint_callback
+
+    def _init_trainer(self):
+        if hyper.gpus in [0, 1]:
+            trainer = pl.Trainer(callbacks=list(self.callbacks.values()), max_epochs=hyper.epoch_num)
+        else:
+            trainer = pl.Trainer(callbacks=list(self.callbacks.values()), max_epochs=hyper.epoch_num, gpus=hyper.gpus,
+                                 accelerator="ddp")
+        self.trainer = trainer
 
     def run(self, mode: str):
         if mode == 'preprocessing':
             self.preprocessing()
         elif mode == 'train':
             self._init_model()
-            self.optimizer = self._optimizer(hyper.optimizer, self.model)
+            self._init_callbacks()
+            self._init_trainer()
             self.train()
         elif mode == 'evaluation':
-            self._init_model()
-            self.load_model(epoch=hyper.evaluation_epoch)
+            self._init_model(load_pre=True, mode=mode)
+            self._init_trainer()
             self.evaluation()
         else:
             raise ValueError('invalid mode')
 
-    def load_model(self, epoch: int):
-        self.model.load_state_dict(torch.load(os.path.join(self.model_dir, self.exp_name + '_' + str(epoch))))
-
-    def save_model(self, epoch: int):
-        if not os.path.exists(self.model_dir):
-            os.mkdir(self.model_dir)
-        torch.save(self.model.state_dict(), os.path.join(self.model_dir, self.exp_name + '_' + str(epoch)))
-
     def evaluation(self):
         dev_set = MultiHeadDataset(hyper.prepared_dev_file)
         loader = textcnn_loader(dev_set, batch_size=hyper.eval_batch, pin_memory=True)
-        self.triplet_metrics.reset()
-        self.model.eval()
-        pbar = tqdm(enumerate(BackgroundGenerator(loader)), total=len(loader))
-        with torch.no_grad():
-            for batch_ndx, sample in pbar:
-                output = self.model(sample, is_train=False)
-                self.triplet_metrics(output['selection_triplets'], output['spo_gold'])
-                self.ner_metrics(output['gold_tags'], output['decoded_tag'])
-
-            triplet_result = self.triplet_metrics.get_metric()
-            ner_result = self.ner_metrics.get_metric()
-            print('Triplets-> ' + ', '.join([
-                "%s: %.4f" % (name[0], value)
-                for name, value in triplet_result.items() if not name.startswith("_")
-            ]) + ' ||' + 'NER->' + ', '.join([
-                "%s: %.4f" % (name[0], value)
-                for name, value in ner_result.items() if not name.startswith("_")
-            ]))
+        self.trainer.test(self.model, test_dataloaders=loader)
 
     def train(self):
         train_set = MultiHeadDataset(hyper.prepared_train_file)
-        train_loader = textcnn_loader(train_set, batch_size=hyper.train_batch, pin_memory=False, shuffle=True)
+        train_loader = textcnn_loader(train_set,
+                                      batch_size=hyper.train_batch,
+                                      pin_memory=False, shuffle=True,
+                                      num_workers=20)
         dev_set = MultiHeadDataset(hyper.prepared_dev_file)
-        val_loader = textcnn_loader(dev_set, batch_size=hyper.eval_batch, pin_memory=False)
-        checkpoint_callback = ModelCheckpoint(monitor="val_f1",
-                                              save_top_k=2,
-                                              dirpath=hyper.model_dir,
-                                              filename='model-{epoch:02d}-{val_f1:.2f}',
-                                              mode="max")
-        trainer = pl.Trainer(callbacks=[checkpoint_callback],
-                             max_epochs=hyper.epoch_num)
-        trainer.fit(self.model, train_dataloader=train_loader, val_dataloaders=val_loader)
-        print(checkpoint_callback.best_model_path)
+        val_loader = textcnn_loader(dev_set,
+                                    batch_size=hyper.eval_batch,
+                                    pin_memory=False,
+                                    num_workers=20)
+        self.trainer.fit(self.model, train_dataloader=train_loader, val_dataloaders=val_loader)
+        hyper.checkpoint_path = self.callbacks["checkpoint_callback"].best_model_path
+        hyper.save_config()
