@@ -66,7 +66,7 @@ class TextCNNPlModel(pl.LightningModule):
             batch = super().transfer_batch_to_device(batch, device)
         return batch
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, optimizer_idx=None):
         batch = self._transfer_batch_to_device(batch)
         logits = self(batch.token_ids)
         loss = self.loss_func(logits, batch.label_ids)
@@ -104,3 +104,10 @@ class TextCNNPlModel(pl.LightningModule):
                           y_pred=y_pred,
                           average="micro")
         self.log("val_f1", val_f1)
+
+    def predict(self, batch: Any, batch_idx: int, dataloader_idx: Optional[int] = None):
+        batch = self._transfer_batch_to_device(batch)
+        logits = self(batch.token_ids)
+        y_pred = torch.argmax(logits, dim=-1).detach().cpu().numpy().tolist()
+        sample_ids = batch.sample_ids
+        return zip(sample_ids, y_pred)
