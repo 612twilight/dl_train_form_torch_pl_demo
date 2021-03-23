@@ -14,8 +14,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import f1_score
 from torch.nn import CrossEntropyLoss
-from torch.optim import Adam
-from transformers import AutoModel,AdamW
+from transformers import AutoModel, AdamW
 
 from model.dataloader.mydataloader import BatchReader
 
@@ -38,19 +37,19 @@ class BertPlModel(pl.LightningModule):
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
+                "params": [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
                 "weight_decay": 0.01,
             },
             {
-                "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
+                "params": [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
                 "weight_decay": 0.0,
             },
         ]
         return AdamW(optimizer_grouped_parameters, lr=2e-5)
 
     def forward(self, x):
-        x = self.bert_model(**x)
-        logits = self.project_layer(x)
+        hidden_state, out = self.bert_model(**x)
+        logits = self.project_layer(out)
         return logits
 
     def _transfer_batch_to_device(self, batch: Any, device: Optional[torch.device] = None) -> Any:
