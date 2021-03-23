@@ -9,8 +9,6 @@ Create Date: 2020/12/3
 """
 import json
 
-import os
-
 
 class Hyper(object):
     def __init__(self, config_file="config/config.json"):
@@ -26,8 +24,7 @@ class Hyper(object):
         :return:
         """
         with open(self.config_file, 'w', encoding="utf8") as writer:
-            writer.write(json.dumps(hyper.__dict__))
+            writer.write(json.dumps(self.__dict__))
 
 
 hyper = Hyper()
-os.makedirs(hyper.model_dir, exist_ok=True)

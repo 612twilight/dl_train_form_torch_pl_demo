@@ -16,11 +16,11 @@ from transformers import AdamW
 from config.hyper import hyper
 from model.dataloader.mydataloader import batch_data_loader
 from model.dataloader.mydataset import MyDataset
-from model.pl_model import TextCNNPlModel
+from model.pl_bert_model import BertPlModel
 from preprocessing.preprocess import Preprocessing
 
 
-class PlRunner(object):
+class BertPlRunner(object):
     def __init__(self, exp_name: str):
         self.exp_name = exp_name
         self.model_dir = hyper.model_dir
@@ -30,19 +30,11 @@ class PlRunner(object):
         self.model = None
         self.callbacks = dict()
 
-    def _optimizer(self, name, model):
-        m = {
-            'adam': Adam(model.parameters()),
-            'sgd': SGD(model.parameters(), lr=0.5),
-            'adamw': AdamW(model.parameters())
-        }
-        return m[name]
-
     def _init_model(self, load_pre=False):
         if not load_pre:
-            self.model = TextCNNPlModel()
+            self.model = BertPlModel()
         else:
-            self.model = TextCNNPlModel.load_from_checkpoint(hyper.checkpoint_path)
+            self.model = BertPlModel.load_from_checkpoint(hyper.checkpoint_path)
 
     def preprocessing(self):
         self.preprocessor.preprocess()

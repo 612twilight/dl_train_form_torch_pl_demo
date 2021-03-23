@@ -17,8 +17,8 @@
 #
 # from config.hyper import hyper
 # from model.component.metrics import F1_triplet, F1_ner
-# from model.dataloader.mydataloader import textcnn_loader as Selection_loader
-# from model.dataloader.mydataset import MultiHeadDataset
+# from model.dataloader.mydataloader import batch_data_loader as Selection_loader
+# from model.dataloader.mydataset import MyDataset
 # from preprocessing.preprocess import Preprocessing
 # from model.pl_model import TextCNNPlModel
 #
@@ -71,7 +71,7 @@
 #         torch.save(self.model.state_dict(), os.path.join(self.model_dir, self.exp_name + '_' + str(epoch)))
 #
 #     def evaluation(self):
-#         dev_set = MultiHeadDataset(hyper.prepared_dev_file)
+#         dev_set = MyDataset(hyper.prepared_dev_file)
 #         loader = Selection_loader(dev_set, batch_size=hyper.eval_batch, pin_memory=True)
 #         self.triplet_metrics.reset()
 #         self.model.eval()
@@ -95,7 +95,7 @@
 #             ]))
 #
 #     def train(self):
-#         train_set = MultiHeadDataset(hyper.prepared_train_file)
+#         train_set = MyDataset(hyper.prepared_train_file)
 #         loader = Selection_loader(train_set, batch_size=hyper.train_batch, pin_memory=True)
 #
 #         for epoch in range(hyper.epoch_num):

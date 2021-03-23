@@ -9,6 +9,7 @@ Create Date: 2020/12/8
 """
 import argparse
 
+from model.pl_bert_trainer import BertPlRunner
 from model.pl_trainer import PlRunner
 
 if __name__ == '__main__':
@@ -16,14 +17,16 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name',
                         '-e',
                         type=str,
-                        default='conll_bert_re',
-                        help='experiments/exp_name.json')
+                        default='bert',
+                        help='bert  textcnn')
     parser.add_argument('--mode',
                         '-m',
                         type=str,
                         default='train',
                         help='preprocessing|train|evaluation')
     args = parser.parse_args()
-
-    config = PlRunner(exp_name=args.exp_name)
+    if args.exp_name == "bert":
+        config = BertPlRunner(exp_name=args.exp_name)
+    else:
+        config = PlRunner(exp_name=args.exp_name)
     config.run(mode=args.mode)

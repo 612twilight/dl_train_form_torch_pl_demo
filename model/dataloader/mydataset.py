@@ -18,7 +18,7 @@ from config.hyper import hyper
 from utils.utils import read_vocab
 
 
-class MultiHeadDataset(Dataset):
+class MyDataset(Dataset):
     """
         下载数据、初始化数据，都可以在这里完成
     """
