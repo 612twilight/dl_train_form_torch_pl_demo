@@ -24,6 +24,7 @@ class BatchReader(object):
         self.label_ids = torch.tensor(transposed_data[1])
         self.token = transposed_data[2]
         self.label = transposed_data[3]
+        self.sample_ids = transposed_data[4]
 
     def pin_memory(self):
         return self

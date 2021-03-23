@@ -100,3 +100,14 @@ class PlRunner(object):
         self.trainer.fit(self.model, train_dataloader=train_loader, val_dataloaders=val_loader)
         hyper.checkpoint_path = self.callbacks["checkpoint_callback"].best_model_path
         hyper.save_config()
+
+    def predict(self):
+        predict_set = MultiHeadDataset(hyper.prepared_predict_file)
+        loader = textcnn_loader(predict_set, batch_size=hyper.eval_batch, pin_memory=True)
+        all_result = self.trainer.predict(self.model, dataloaders=loader)
+        for batch_result in all_result:
+            for sample_id, y_pred in batch_result:
+                instance = predict_set.instances[sample_id]
+                print(instance["label"] + "\t" + "".join(instance["text"]))
+                print("predict_result:\t" + predict_set.index2label[y_pred])
+                print()

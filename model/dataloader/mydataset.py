@@ -26,28 +26,32 @@ class MultiHeadDataset(Dataset):
     def __init__(self, file_path):
         self.word2index = read_vocab(hyper.vocab_path)
         self.label2index = read_vocab(hyper.label_path)
+        self.index2label = {index: label for label, index in self.label2index.items()}
         self.tokens = []
         self.labels = []
+        self.sample_ids = []
         if hyper.encoder == "bert":
             self.tokenizer = AutoTokenizer.from_pretrained(hyper.bert_base_chinese)
-        instances = []
+        self.instances = dict()
         for line in open(file_path, 'r', encoding='utf8'):
             line = line.strip("\n")
             instance = json.loads(line)
-            instances.append(instance)
-        for instance in instances:
+            self.instances[instance["sample_id"]] = instance
+        for instance in self.instances.values():
             self.tokens.append(instance['text'])
             self.labels.append(instance['label'])
+            self.sample_ids.append(instance['sample_id'])
 
     def __getitem__(self, index):
         token = self.tokens[index]
         label = self.labels[index]
+        sample_id = self.sample_ids[index]
         if hyper.encoder == "bert":
             tokens_id = self.bert_token2id(token)
         else:
             tokens_id = self.token2tensor(token)
         label_id = self.label2tensor(label)
-        return tokens_id, label_id, token, label
+        return tokens_id, label_id, token, label, sample_id
 
     def __len__(self):
         return len(self.tokens)
