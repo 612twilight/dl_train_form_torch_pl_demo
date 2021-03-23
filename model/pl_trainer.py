@@ -14,7 +14,6 @@ from torch.optim import Adam, SGD
 from transformers import AdamW
 
 from config.hyper import hyper
-from model.component.metrics import F1_triplet, F1_ner
 from model.dataloader.mydataloader import textcnn_loader
 from model.dataloader.mydataset import MultiHeadDataset
 from model.pl_model import TextCNNPlModel
@@ -27,8 +26,6 @@ class PlRunner(object):
         self.model_dir = hyper.model_dir
 
         self.preprocessor = Preprocessing()
-        self.triplet_metrics = F1_triplet()
-        self.ner_metrics = F1_ner()
         self.optimizer = None
         self.model = None
         self.callbacks = dict()
