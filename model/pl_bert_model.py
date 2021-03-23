@@ -31,11 +31,15 @@ class BertPlModel(pl.LightningModule):
         self.loss_func = CrossEntropyLoss()
 
     def configure_optimizers(self):
+        """
+        transformers\trainer  create_optimizer_and_scheduler()
+        """
+
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
                 "params": [p for n, p in self.model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": self.args.weight_decay,
+                "weight_decay": 0.01,
             },
             {
                 "params": [p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)],
